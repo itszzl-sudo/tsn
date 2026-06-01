@@ -1,0 +1,45 @@
+﻿cargo :     Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+所在位置 行:1 字符: 27
++ ... _INCREMENTAL=0; cargo test --bin tsn -- --test-threads=1 2>&1 | Out-F ...
++                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (    Finished `t...get(s) in 0.07s:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+     Running unittests src\main.rs (target\debug\deps\tsn-b9075660f702ab71.exe)
+
+running 19 tests
+test codegen::tests::test_codegen_add_function ... ok
+test codegen::tests::test_codegen_break_continue ... ok
+test codegen::tests::test_codegen_simple_function ... ok
+test codegen::tests::test_codegen_string_literal ... ok
+test codegen::tests::test_codegen_while_loop ... ok
+test config::tests::test_default_config ... FAILED
+test config::tests::test_parse_config ... ok
+test extension::tests::test_parse_manifest ... ok
+test ts_parser::tests::test_parse_array ... ok
+test ts_parser::tests::test_parse_break_continue ... ok
+test ts_parser::tests::test_parse_for ... ok
+test ts_parser::tests::test_parse_function ... ok
+test ts_parser::tests::test_parse_if_else ... ok
+test ts_parser::tests::test_parse_number ... ok
+test ts_parser::tests::test_parse_object ... ok
+test ts_parser::tests::test_parse_string ... ok
+test ts_parser::tests::test_parse_ternary ... ok
+test ts_parser::tests::test_parse_typeof ... ok
+test ts_parser::tests::test_parse_while ... ok
+
+failures:
+
+---- config::tests::test_default_config stdout ----
+
+thread 'config::tests::test_default_config' (17256) panicked at src\config.rs:122:9:
+assertion failed: config.extensions.auto_discover
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    config::tests::test_default_config
+
+test result: FAILED. 18 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `--bin tsn`
