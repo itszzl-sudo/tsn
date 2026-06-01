@@ -807,24 +807,8 @@ fn compile_expr(
                                 } else {
                                     builder.ins().f64const(f64::from_bits(UNDEFINED))
                                 }
-                            } else if name.contains(".") || name.starts_with("js_") {
-                                let arg_values: Vec<Value> = args.iter()
-                                    .map(|arg| compile_expr(arg, builder, variables, module, function_ids, _string_data, registry))
-                                    .collect();
-                                let mut sig = module.make_signature();
-                                for _ in 0..arg_values.len() {
-                                    sig.params.push(AbiParam::new(types::F64));
-                                }
-                                sig.returns.push(AbiParam::new(types::F64));
-                                let c_name = format!("js_{}", name.replace(".", "_"));
-                                if let Ok(id) = module.declare_function(&c_name, Linkage::Import, &sig) {
-                                    let func_ref = module.declare_func_in_func(id, &mut builder.func);
-                                    let call = builder.ins().call(func_ref, &arg_values);
-                                    builder.inst_results(call)[0]
-                                } else {
-                                    builder.ins().f64const(f64::from_bits(UNDEFINED))
-                                }
                             } else {
+                                eprintln!("[codegen] Warning: unresolved call '{}' - not in builtins or registry", name);
                                 builder.ins().f64const(f64::from_bits(UNDEFINED))
                             }
                         }
