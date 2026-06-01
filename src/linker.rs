@@ -136,6 +136,51 @@ impl Linker {
         } else {
             return libs;
         };
+
+        let tsnp_dir = cwd.join("tsnp");
+        if tsnp_dir.exists() {
+            if let Ok(entries) = std::fs::read_dir(&tsnp_dir) {
+                for entry in entries.flatten() {
+                    let toml_path = entry.path().join("ts-native.toml");
+                    if toml_path.exists() {
+                        if let Ok(content) = std::fs::read_to_string(&toml_path) {
+                            if let Ok(ext) = content.parse::<toml::Value>() {
+                                if let Some(link) = ext.get("link") {
+                                    if let Some(lib) = link.get("lib").and_then(|v| v.as_str()) {
+                                        for search_dir in [&cwd, cwd.parent().unwrap_or(&cwd)] {
+                                            let lib_path = search_dir.join(lib);
+                                            if lib_path.exists() {
+                                                eprintln!("[link] Found lib from tsnp: {:?}", lib_path);
+                                                if let Some(normalized) = Self::normalize_path(lib_path) {
+                                                    libs.push(normalized);
+                                                }
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if let Some(libs_arr) = link.get("libs").and_then(|v| v.as_array()) {
+                                        for lib_val in libs_arr {
+                                            if let Some(lib) = lib_val.as_str() {
+                                                for search_dir in [&cwd, cwd.parent().unwrap_or(&cwd)] {
+                                                    let lib_path = search_dir.join(lib);
+                                                    if lib_path.exists() {
+                                                        eprintln!("[link] Found lib from tsnp: {:?}", lib_path);
+                                                        if let Some(normalized) = Self::normalize_path(lib_path) {
+                                                            libs.push(normalized);
+                                                        }
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         
         let candidates = vec![
             cwd.join("ts-native-stdlib/target/release/ts_native_stdlib.lib"),

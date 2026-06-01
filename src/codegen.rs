@@ -563,14 +563,15 @@ fn compile_expr(
             if let Some((data_id, _bytes)) = _string_data.get(s) {
                 let gv = module.declare_data_in_func(*data_id, &mut builder.func);
                 let addr = builder.ins().global_value(types::I64, gv);
+                let addr_as_f64 = builder.ins().fcvt_from_sint(types::F64, addr);
                 
                 let mut sig = module.make_signature();
-                sig.params.push(AbiParam::new(types::I64));
+                sig.params.push(AbiParam::new(types::F64));
                 sig.returns.push(AbiParam::new(types::F64));
                 
                 if let Ok(id) = module.declare_function("js_string_from_static", cranelift_module::Linkage::Import, &sig) {
                     let func_ref = module.declare_func_in_func(id, &mut builder.func);
-                    let call = builder.ins().call(func_ref, &[addr]);
+                    let call = builder.ins().call(func_ref, &[addr_as_f64]);
                     builder.inst_results(call)[0]
                 } else {
                     builder.ins().f64const(f64::from_bits(UNDEFINED))
@@ -866,14 +867,14 @@ fn compile_expr(
             let len = elements.len();
             
             let mut sig_new = module.make_signature();
-            sig_new.params.push(AbiParam::new(types::I32));
+            sig_new.params.push(AbiParam::new(types::F64));
             sig_new.returns.push(AbiParam::new(types::F64));
             
             let arr_new_id = module.declare_function("js_array_new", cranelift_module::Linkage::Import, &sig_new);
             
             if let Ok(id) = arr_new_id {
                 let func_ref = module.declare_func_in_func(id, &mut builder.func);
-                let capacity = builder.ins().iconst(types::I32, len as i64);
+                let capacity = builder.ins().f64const(len as f64);
                 let call = builder.ins().call(func_ref, &[capacity]);
                 let arr_val = builder.inst_results(call)[0];
                 
