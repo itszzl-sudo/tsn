@@ -2,89 +2,32 @@
 
 TypeScript to native executable compiler.
 
-**Quick start with cargo-tsn:**
+**Nightly Release** - Latest features, experimental builds.
+
+**For stable production-ready releases, see [ts-native](https://github.com/itszzl-sudo/ts-native).**
+
+## Quick Start
 
 ```bash
+# Install nightly build
+cargo install tsn
+
+# Compile TypeScript to native executable
+tsn main.ts
+./a.exe
+```
+
+## Project Management (Recommended)
+
+```bash
+# Install project manager
 cargo install cargo-tsn
-cargo tsn new my-project
-cd my-project
-tsn main.ts
-./a.exe
-```
 
-See [cargo-tsn README](https://crates.io/crates/cargo-tsn) for project management.
-
-## What is it
-
-A compiler that converts TypeScript to native executable (10-14KB), no Node.js required.
-
-## What can it do
-
-- Compile TypeScript to native `.exe`
-- Generate dependency-free executables
-- Call Rust FFI functions
-- No runtime overhead
-
-## How to use
-
-```bash
-tsn main.ts
-./a.exe
-```
-
-**Output:**
-- `a.o` - Object file
-- `a.exe` - Native executable
-
-## Limitations
-
-tsn has very few built-in functions (only `print`).
-
-## Solution
-
-Extend capabilities by integrating existing Rust crates via FFI.
-
-## Extension mechanism
-
-tsn scans `./tsnp/` directory for plugin configurations:
-
-```
-project/
-├── tsnp/
-│   └── my-plugin/
-│       └── ts-native.toml
-└── main.ts
-
-tsn main.ts  # Automatically loads plugins from tsnp/
-```
-
-### ts-native.toml format
-
-```toml
-[package]
-name = "tsnp-my-plugin"
-version = "0.1.0"
-tsnpVersion = "0.1.0"
-
-[functions]
-"add" = { args = ["number", "number"], ret = "number", impl_name = "add" }
-
-[link]
-lib = "my-plugin"
-```
-
-**Version Fields:**
-- `version` - The original Rust crate version
-- `tsnpVersion` - The tsnp plugin version (allows independent versioning)
-
-### Using cargo-tsn (Recommended)
-
-```bash
-# Create project
+# Create a new project
 cargo tsn new my-project
 cd my-project
 
-# Add Rust crate dependency
+# Add dependencies
 cargo tsn add regex
 
 # Interactively add FFI functions
@@ -92,24 +35,22 @@ cargo tsn func
 
 # Compile
 tsn main.ts
+./a.exe
 ```
 
-See [cargo-tsn](https://crates.io/crates/cargo-tsn) for details.
+## What is tsn
 
-### Using tsnp directly
+A compiler that converts TypeScript to native executable (10-14KB), no Node.js required.
 
-```bash
-# Generate plugin from Rust crate
-tsnp gen my-plugin
+## Key Features
 
-# Output: tsnp/my-plugin/ts-native.toml
-```
+- **Tiny executables**: 10-14KB native binaries
+- **No runtime**: Zero dependencies, no Node.js
+- **FFI integration**: Call Rust/C functions directly
+- **NaN-boxing**: Efficient value representation
+- **Latest features**: Modular C runtime, tsnp plugin spec, rapid iteration
 
-See [tsnp](https://crates.io/crates/tsnp) for details.
-
-## How it works
-
-### Compilation pipeline
+## Architecture
 
 ```
 TypeScript source
@@ -129,7 +70,7 @@ TypeScript source
 Native executable
 ```
 
-### Value representation: NaN-boxing
+## Value Representation
 
 All JavaScript values fit in 64 bits using NaN-boxing:
 
@@ -143,57 +84,53 @@ TRUE        = 0x7FFF_0000_0000_0001
 FALSE       = 0x7FFF_0000_0000_0000
 ```
 
-**Benefits:**
-- No boxing/unboxing overhead
-- Type checks are bitmask operations
-- Pointers stored directly in value
+## Extension System
 
-### Backend: Cranelift
+tsn scans `./tsnp/` directory for plugin configurations:
 
-- Modern code generator
-- Optimized x86_64 output
-- No LLVM dependency
-- Fast compilation
+```toml
+# tsnp/my-plugin/ts-native.toml
+[package]
+name = "my-plugin"
+version = "0.1.0"
+description = "My plugin for tsn"
 
-### Memory management
+[ffi]
+c_module = "runtime/runtime_plugin.c"
 
-- Arena allocation for AST
-- Heap allocation for strings/arrays/objects
-- No garbage collector (manual memory management)
+[functions]
+"add" = { args = ["number", "number"], ret = "number", impl_name = "js_add" }
 
-### FFI integration
-
-When tsn encounters a function call:
-
-1. Check if function exists in `tsnp/*/ts-native.toml`
-2. Load function signature (args, return type)
-3. Generate FFI call to Rust function
-4. Handle type conversions
-
-Example:
-
-```typescript
-// TypeScript
-const result = add(1, 2);
+[link]
+libs = ["mosquitto"]
+flags = []
 ```
 
-```rust
-// Rust FFI
-#[no_mangle]
-pub extern "C" fn add(a: i32, b: i32) -> i32 {
-    a + b
-}
+## Modular C Runtime
+
+tsn features a modular C runtime architecture:
+
+```
+runtime/
+├── runtime.h          # Public headers (NaN-boxing, callbacks)
+├── runtime_core.c     # Core runtime (callback dispatcher)
+├── runtime_dom.c      # DOM extension (js_dom_*)
+└── runtime_mqtt.c     # MQTT extension (js_mqtt_*)
 ```
 
-tsn generates:
-- Load arguments to registers
-- Call Rust function
-- Store return value
+Link only the modules you need:
 
-## Supported TypeScript features
+```bash
+# Minimal runtime
+gcc ui.o runtime_core.c -o app.exe
 
-### Data types
+# DOM + MQTT
+gcc ui.o runtime_core.c runtime_dom.c runtime_mqtt.c -o app.exe -lmosquitto
+```
 
+## Supported TypeScript
+
+### Data Types
 - ✅ Numbers (integers, floats)
 - ✅ Strings (dynamic allocation, concatenation)
 - ✅ Arrays (dynamic allocation, nested)
@@ -201,15 +138,13 @@ tsn generates:
 - ✅ Boolean, null, undefined
 
 ### Operators
-
 - ✅ Arithmetic: `+ - * / %`
 - ✅ Comparison: `== != < > <= >=`
 - ✅ Logical: `&& || !`
 - ✅ Ternary: `cond ? then : else`
 - ✅ `typeof` operator
 
-### Control flow
-
+### Control Flow
 - ✅ `if` statement
 - ✅ `if-else` statement
 - ✅ `while` loop
@@ -217,15 +152,13 @@ tsn generates:
 - ✅ `return` statement
 
 ### Functions
-
 - ✅ Function definition
 - ✅ Function call
 - ✅ Multiple parameters
 - ✅ Return values
 - ✅ Recursion
 
-### Data structures
-
+### Data Structures
 - ✅ Array literals `[1, 2, 3]`
 - ✅ Array indexing `arr[i]`
 - ✅ Array assignment `arr[i] = value`
@@ -233,7 +166,7 @@ tsn generates:
 - ✅ Property access `obj.x`
 - ✅ Property assignment `obj.x = value`
 
-## Not implemented
+## Not Implemented
 
 - `break`, `continue`
 - `switch` statement
@@ -242,13 +175,7 @@ tsn generates:
 - Modules
 - Generics
 
-## Installation
-
-```bash
-cargo install tsn
-```
-
-## Project structure
+## Project Structure
 
 ```
 tsn/
@@ -258,15 +185,33 @@ tsn/
 │   ├── codegen.rs    # Cranelift code generation
 │   ├── linker.rs     # Native linker
 │   ├── extension.rs  # Plugin loading
-│   └── runtime.rs    # Runtime helpers
+│   ├── builtins.rs   # Built-in functions (Math.*)
+│   └── hir.rs        # High-level IR
+├── runtime/
+│   ├── runtime.h     # Public headers
+│   ├── runtime_core.c
+│   ├── runtime_dom.c
+│   └── runtime_mqtt.c
+├── tsnp/
+│   ├── dom-iot/
+│   │   └── ts-native.toml
+│   └── mqtt/
+│       └── ts-native.toml
 └── Cargo.toml
 ```
 
+## Release Schedule
+
+- **Stable (ts-native)**: Weekly updates, production-ready
+- **Nightly (tsn)**: Random updates, latest features
+
+Choose **tsn** for experimenting with new features, **ts-native** for production.
+
 ## Links
 
-- [cargo-tsn](https://crates.io/crates/cargo-tsn) - Project manager
-- [tsnp](https://crates.io/crates/tsnp) - Plugin generator
-- [GitHub](https://github.com/itszzl-sudo/ts-native)
+- [ts-native (Stable)](https://github.com/itszzl-sudo/ts-native) - Production-ready
+- [cargo-tsn](https://github.com/itszzl-sudo/cargo-tsn) - Project manager
+- [tsnp](https://github.com/itszzl-sudo/tsnp) - Plugin generator
 
 ## License
 
