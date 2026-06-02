@@ -187,14 +187,27 @@ tsnp/<name>/
 [package]
 name = "tsnp-regex"
 version = "0.1.0"
+description = "Regex extension for tsn"
+
+[ffi]
+c_module = "runtime/runtime_regex.c"
 
 [functions]
 "add" = { args = ["number", "number"], ret = "number", impl_name = "add" }
 "multiply" = { args = ["number", "number"], ret = "number", impl_name = "multiply" }
 
 [link]
-lib = "regex"
+libs = ["regex"]
+flags = []
 ```
+
+**字段说明：**
+- `[ffi]` - C扩展模块配置（可选）
+  - `c_module` - C源文件路径（相对于tsn根目录）
+- `[functions]` - FFI函数映射
+- `[link]` - 链接配置
+  - `libs` - 需要链接的库列表（数组格式）
+  - `flags` - 链接标志（数组格式）
 
 ## 类型映射
 
