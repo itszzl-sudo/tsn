@@ -349,10 +349,15 @@ fn compile_stmt(
                 builder.ins().f64const(f64::from_bits(UNDEFINED))
             };
             
-            let var_idx = variables.len();
-            let var = Variable::new(var_idx);
-            variables.insert(name.clone(), var);
-            builder.declare_var(var, types::F64);
+            let var = if let Some(&existing_var) = variables.get(name) {
+                existing_var
+            } else {
+                let var_idx = variables.len();
+                let var = Variable::new(var_idx);
+                variables.insert(name.clone(), var);
+                builder.declare_var(var, types::F64);
+                var
+            };
             builder.def_var(var, val);
             false
         }
