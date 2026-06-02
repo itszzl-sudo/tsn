@@ -18,6 +18,12 @@ pub fn lookup_builtin(name: &str) -> Option<BuiltinInfo> {
         "element.textContent" => Some(BuiltinInfo { c_name: "js_dom_set_text_content", param_count: 2, has_return: false }),
         "browser.setHTML" => Some(BuiltinInfo { c_name: "js_browser_set_html", param_count: 1, has_return: false }),
         "browser.render" => Some(BuiltinInfo { c_name: "js_browser_render", param_count: 0, has_return: false }),
+        "dom.mainLoop" => Some(BuiltinInfo { c_name: "js_dom_main_loop", param_count: 0, has_return: false }),
+        "element.setAttribute" => Some(BuiltinInfo { c_name: "js_dom_set_attribute", param_count: 3, has_return: false }),
+        "element.addEventListener" => Some(BuiltinInfo { c_name: "js_dom_add_event_listener", param_count: 3, has_return: false }),
+        "element.value" => Some(BuiltinInfo { c_name: "js_dom_set_value", param_count: 2, has_return: false }),
+        "document.createTextNode" => Some(BuiltinInfo { c_name: "js_dom_create_text_node", param_count: 1, has_return: true }),
+        "document.getElementById" => Some(BuiltinInfo { c_name: "js_dom_get_element_by_id", param_count: 1, has_return: true }),
         _ => None,
     }
 }
