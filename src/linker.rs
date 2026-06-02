@@ -226,6 +226,10 @@ impl Linker {
         let mut ld_args = vec![
             "-o".to_string(),
             self.output_name.clone(),
+            "-dynamic-linker".to_string(),
+            "/lib64/ld-linux-x86-64.so.2".to_string(),
+            "/usr/lib/x86_64-linux-gnu/crt1.o".to_string(),
+            "/usr/lib/x86_64-linux-gnu/crti.o".to_string(),
         ];
         
         for obj in object_files {
@@ -233,6 +237,7 @@ impl Linker {
         }
         
         ld_args.push("-lc".to_string());
+        ld_args.push("/usr/lib/x86_64-linux-gnu/crtn.o".to_string());
         
         let output = Command::new("ld")
             .args(&ld_args)
@@ -251,6 +256,8 @@ impl Linker {
         let mut ld_args = vec![
             "-o".to_string(),
             self.output_name.clone(),
+            "-L/usr/lib".to_string(),
+            "-L/usr/local/lib".to_string(),
         ];
         
         for obj in object_files {
@@ -258,6 +265,8 @@ impl Linker {
         }
         
         ld_args.push("-lSystem".to_string());
+        ld_args.push("-syslibroot".to_string());
+        ld_args.push("/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk".to_string());
         
         let output = Command::new("ld")
             .args(&ld_args)
@@ -294,7 +303,8 @@ impl Linker {
     }
     
     pub fn link_with_clang(&self, object_files: &[&str]) -> Result<Vec<u8>> {
-        let clang_path = "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\Llvm\\x64\\bin\\clang.exe";
+        let clang_path = std::env::var("TSN_CLANG")
+            .unwrap_or_else(|_| "clang".to_string());
         
         let mut clang_args = vec![
             "-Wl,/ENTRY:_start".to_string(),
@@ -308,9 +318,10 @@ impl Linker {
         
         clang_args.push("-lkernel32".to_string());
         
-        let output = Command::new(clang_path)
+        let output = Command::new(&clang_path)
             .args(&clang_args)
-            .output()?;
+            .output()
+            .map_err(|e| anyhow::anyhow!("Failed to execute clang '{}': {}", clang_path, e))?;
         
         if !output.status.success() {
             anyhow::bail!("Clang link failed: {}", String::from_utf8_lossy(&output.stderr));
