@@ -131,15 +131,11 @@ impl ExtensionRegistry {
 
     pub fn register_builtins(&mut self) {
         use crate::builtins::{lookup_builtin, ArgType as BA, RetType as BR};
-        
+
         let builtin_names = [
             "Math.sin", "Math.cos", "Math.sqrt", "Math.abs", "Math.floor", "Math.ceil", "Math.pow",
-            "document.createElement", "element.appendChild", "element.textContent",
-            "browser.setHTML", "browser.render", "dom.mainLoop",
-            "element.setAttribute", "element.addEventListener", "element.value",
-            "document.createTextNode", "document.getElementById",
         ];
-        
+
         let mut functions = HashMap::new();
         for name in &builtin_names {
             if let Some(info) = lookup_builtin(name) {
@@ -162,12 +158,12 @@ impl ExtensionRegistry {
                 });
             }
         }
-        
+
         let ext = Extension {
             package: ExtensionPackage {
                 name: "tsn-builtins".to_string(),
                 version: "0.1.0".to_string(),
-                description: "Built-in JavaScript functions".to_string(),
+                description: "Built-in JavaScript functions (Math.*)".to_string(),
             },
             functions,
             link: LinkConfig::default(),
