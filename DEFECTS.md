@@ -19,18 +19,12 @@
 | 3.1 | RuntimeFunctions 死代码 | 2026-06-02 | 删除RuntimeFunctions结构体和declare_runtime_functions |
 | 3.5 | set_registry 死代码 | 2026-06-02 | 删除未使用的set_registry方法 |
 | 5.3 | 错误信息不定位源码 | 2026-06-02 | HIR添加SourceSpan，codegen输出函数位置（行号待填充） |
+| 1.3 | 字符串参数传递断裂 | 2026-06-02 | 添加js_unbox_string/js_box_string运行时函数，codegen对String类型参数自动拆箱/装箱 |
 
 ---
 
 ## 一、FFI 机制缺陷
 
-
-### 1.3 字符串参数传递断裂
-
-- **位置**: `codegen.rs` Call 节点处理
-- **问题**: C 库期望 `const char*`，tsn 传的是 NaN-boxed F64，无运行时拆箱转换层
-- **影响**: 无法直接调用接受字符串参数的 C 函数
-- **修复难度**: 中
 
 ### 1.4 回调函数不支持
 
@@ -210,7 +204,7 @@
 
 ### P1 - 应当修复（影响可用性）
 
-1. 字符串参数传递断裂（1.3）
+（全部已修复 ✅）
 
 ### P2 - 建议修复（影响体验）
 

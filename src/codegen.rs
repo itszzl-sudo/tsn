@@ -830,7 +830,18 @@ fn compile_expr(
                                             .map(|(&val, at)| match at {
                                                 crate::extension::ArgType::Number | crate::extension::ArgType::Any => val,
                                                 crate::extension::ArgType::Boolean => builder.ins().fcvt_to_sint(types::I32, val),
-                                                crate::extension::ArgType::String => builder.ins().fcvt_to_sint(types::I64, val),
+                                                crate::extension::ArgType::String => {
+                                                    let mut unbox_sig = module.make_signature();
+                                                    unbox_sig.params.push(AbiParam::new(types::F64));
+                                                    unbox_sig.returns.push(AbiParam::new(types::I64));
+                                                    if let Ok(unbox_id) = module.declare_function("js_unbox_string", Linkage::Import, &unbox_sig) {
+                                                        let unbox_ref = module.declare_func_in_func(unbox_id, &mut builder.func);
+                                                        let unbox_call = builder.ins().call(unbox_ref, &[val]);
+                                                        builder.inst_results(unbox_call)[0]
+                                                    } else {
+                                                        builder.ins().fcvt_to_sint(types::I64, val)
+                                                    }
+                                                }
                                                 _ => val,
                                             })
                                             .collect();
@@ -838,7 +849,18 @@ fn compile_expr(
                                         let raw = builder.inst_results(call)[0];
                                         match func_info.ret {
                                             crate::extension::RetType::Boolean => builder.ins().fcvt_from_sint(types::F64, raw),
-                                            crate::extension::RetType::String => builder.ins().fcvt_from_sint(types::F64, raw),
+                                            crate::extension::RetType::String => {
+                                                let mut box_sig = module.make_signature();
+                                                box_sig.params.push(AbiParam::new(types::I64));
+                                                box_sig.returns.push(AbiParam::new(types::F64));
+                                                if let Ok(box_id) = module.declare_function("js_box_string", Linkage::Import, &box_sig) {
+                                                    let box_ref = module.declare_func_in_func(box_id, &mut builder.func);
+                                                    let box_call = builder.ins().call(box_ref, &[raw]);
+                                                    builder.inst_results(box_call)[0]
+                                                } else {
+                                                    builder.ins().fcvt_from_sint(types::F64, raw)
+                                                }
+                                            }
                                             _ => raw,
                                         }
                                     } else {
