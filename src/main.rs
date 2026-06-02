@@ -5,12 +5,8 @@ use hir::{HirExpr, BinOp, SourceSpan};
 mod hir;
 mod builtins;
 mod codegen;
-#[allow(dead_code)]
-mod runtime;
 mod ts_parser;
 mod linker;
-#[allow(dead_code)]
-mod pe_builder;
 mod extension;
 #[allow(dead_code)]
 mod config;
@@ -30,6 +26,8 @@ fn main() -> Result<()> {
     }
     
     let mut registry = extension::ExtensionRegistry::new();
+    
+    registry.register_builtins();
     
     let tsnp_dir = std::path::PathBuf::from("tsnp");
     if tsnp_dir.exists() {

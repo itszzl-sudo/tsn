@@ -1034,6 +1034,7 @@ impl Default for CodeGen {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::hir::SourceSpan;
 
     fn compile_exprs(exprs: &[HirExpr]) -> Result<Vec<u8>> {
         let mut codegen = CodeGen::new();

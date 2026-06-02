@@ -20,6 +20,10 @@
 | 3.5 | set_registry 死代码 | 2026-06-02 | 删除未使用的set_registry方法 |
 | 5.3 | 错误信息不定位源码 | 2026-06-02 | HIR添加SourceSpan，codegen输出函数位置（行号待填充） |
 | 1.3 | 字符串参数传递断裂 | 2026-06-02 | 添加js_unbox_string/js_box_string运行时函数，codegen对String类型参数自动拆箱/装箱 |
+| 3.4 | C运行时内联未使用 | 2026-06-02 | 删除linker.rs中create_c_runtime()死代码 |
+| 3.3 | 运行时双实现 | 2026-06-02 | 删除runtime.rs和pe_builder.rs死代码，统一使用C运行时 |
+| 3.2 | builtins与registry重叠 | 2026-06-02 | 添加ExtensionRegistry.register_builtins()，builtins注册为默认Extension |
+| 5.1 | release stack overflow | 2026-06-02 | Cargo.toml添加[profile.release]，cranelift-codegen opt-level=1避免栈溢出 |
 
 ---
 
@@ -64,27 +68,7 @@
 
 ## 三、架构设计问题
 
-
-### 3.2 builtins 与 registry 职责重叠
-
-- **位置**: `builtins.rs` + `extension.rs`
-- **问题**: `builtins.rs` 中的映射完全可以用 `ExtensionRegistry` + ts-native.toml 替代，当前是两套并行的映射机制
-- **影响**: 新增内置函数需同时改两个地方，容易遗漏
-- **修复难度**: 中（将 builtins 迁移为默认 Extension）
-
-### 3.3 运行时双实现
-
-- **位置**: `runtime.rs`（Rust）+ `linker.rs::create_c_runtime()`（C）+ 外部 `runtime_nocrt.o`
-- **问题**: 三套运行时实现，`runtime.rs` 和 `create_c_runtime()` 都标记为 `#[allow(dead_code)]` 未使用
-- **影响**: 代码冗余，新人困惑该用哪个
-- **修复难度**: 中（统一为一套）
-
-### 3.4 C 运行时内联未使用
-
-- **位置**: `linker.rs` 第257行 `create_c_runtime()`
-- **问题**: 返回 C 源码字符串，但标记为 `#[allow(dead_code)]`，实际未使用
-- **影响**: 死代码
-- **修复难度**: 低
+（无待修复项）
 
 ---
 
@@ -136,11 +120,6 @@
 
 ## 五、编译器质量问题
 
-### 5.1 release 构建 stack overflow
-
-- **问题**: `cargo build --release` 时 Cranelift 编译触发 `STATUS_STACK_BUFFER_OVERRUN`
-- **影响**: 无法生成 release 优化构建
-- **修复难度**: 中（可能需调整 Cranelift 优化参数或 Rust 栈大小）
 
 ### 5.2 无增量编译
 
@@ -208,15 +187,12 @@
 
 ### P2 - 建议修复（影响体验）
 
-2. builtins 与 registry 重叠（3.2）
-3. 运行时双实现（3.3）
-4. release 构建 stack overflow（5.1）
-5. 标准库缺失（String/Array方法等）
+1. 标准库缺失（String/Array方法等）
 
 ### P3 - 长期目标
 
-6. 回调函数支持（1.4）
-7. 结构体传递（1.5）
-8. class/async/闭包/泛型（4.2-4.5）
-9. 增量编译（5.2）
-10. DWARF 调试信息（5.4）
+2. 回调函数支持（1.4）
+3. 结构体传递（1.5）
+4. class/async/闭包/泛型（4.2-4.5）
+5. 增量编译（5.2）
+6. DWARF 调试信息（5.4）

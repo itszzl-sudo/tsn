@@ -128,6 +128,52 @@ impl ExtensionRegistry {
     pub fn is_external_function(&self, ts_name: &str) -> bool {
         self.function_map.contains_key(ts_name)
     }
+
+    pub fn register_builtins(&mut self) {
+        use crate::builtins::{lookup_builtin, ArgType as BA, RetType as BR};
+        
+        let builtin_names = [
+            "Math.sin", "Math.cos", "Math.sqrt", "Math.abs", "Math.floor", "Math.ceil", "Math.pow",
+            "document.createElement", "element.appendChild", "element.textContent",
+            "browser.setHTML", "browser.render", "dom.mainLoop",
+            "element.setAttribute", "element.addEventListener", "element.value",
+            "document.createTextNode", "document.getElementById",
+        ];
+        
+        let mut functions = HashMap::new();
+        for name in &builtin_names {
+            if let Some(info) = lookup_builtin(name) {
+                let args: Vec<ArgType> = info.param_types.iter().map(|t| match t {
+                    BA::F64 => ArgType::Number,
+                    BA::I64 => ArgType::String,
+                    BA::I32 => ArgType::Boolean,
+                }).collect();
+                let ret = match info.ret_type {
+                    BR::F64 => RetType::Number,
+                    BR::I64 => RetType::String,
+                    BR::I32 => RetType::Boolean,
+                    BR::Void => RetType::Void,
+                };
+                functions.insert(name.to_string(), ExternalFunction {
+                    args,
+                    ret,
+                    impl_name: info.c_name.to_string(),
+                    is_property: false,
+                });
+            }
+        }
+        
+        let ext = Extension {
+            package: ExtensionPackage {
+                name: "tsn-builtins".to_string(),
+                version: "0.1.0".to_string(),
+                description: "Built-in JavaScript functions".to_string(),
+            },
+            functions,
+            link: LinkConfig::default(),
+        };
+        self.register(ext);
+    }
 }
 
 pub fn parse_manifest(path: &Path) -> Result<Extension> {
