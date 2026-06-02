@@ -38,8 +38,36 @@ fn main() -> Result<()> {
         println!("加载了 {} 个扩展包", registry.extensions.len());
     }
     
-    let input_file = &args[1];
+    let mut input_file: Option<&str> = None;
+    let mut output_file: Option<String> = None;
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "-o" => {
+                if i + 1 >= args.len() {
+                    anyhow::bail!("-o requires an argument");
+                }
+                i += 1;
+                output_file = Some(args[i].clone());
+            }
+            s if !s.starts_with('-') => {
+                input_file = Some(s);
+            }
+            _ => {
+                eprintln!("Unknown flag: {}", args[i]);
+            }
+        }
+        i += 1;
+    }
+    
+    let input_file = input_file.ok_or_else(|| anyhow::anyhow!("No input file specified"))?;
     let source = std::fs::read_to_string(input_file)?;
+    
+    let default_output = std::path::Path::new(input_file)
+        .with_extension("o")
+        .to_string_lossy()
+        .to_string();
+    let output_file = output_file.unwrap_or(default_output);
     
     println!("\n解析 TypeScript: {}", input_file);
     let hir = ts_parser::parse(&source)?;
@@ -48,8 +76,7 @@ fn main() -> Result<()> {
     let mut codegen = CodeGen::new().with_registry(registry.clone());
     let binary = codegen.compile(&hir)?;
     
-    let output_file = args.get(3).map(|s| s.as_str()).unwrap_or("a.o");
-    std::fs::write(output_file, &binary)?;
+    std::fs::write(&output_file, &binary)?;
     
     println!("✅ 输出: {} ({} bytes)", output_file, binary.len());
     
@@ -57,7 +84,7 @@ fn main() -> Result<()> {
         let exe_file = output_file.replace(".o", ".exe");
         println!("\n尝试链接为可执行文件...");
         
-        let link_result = try_link(output_file, &exe_file, &registry);
+        let link_result = try_link(&output_file, &exe_file, &registry);
         match link_result {
             Ok(size) => println!("✅ 生成: {} ({} bytes)", exe_file, size),
             Err(e) => println!("⚠️  链接失败（需要安装链接器）: {}", e),

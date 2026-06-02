@@ -20,8 +20,9 @@ enum Token {
     LBracket, RBracket,
     
     Plus, Minus, Star, Slash, Percent,
-    EqEqEq, NotEqEq, Lt, Le, Gt, Ge,
+    EqEq, EqEqEq, NotEq, NotEqEq, Lt, Le, Gt, Ge,
     AndAnd, OrOr,
+    BitAnd, BitOr, BitXor, Shl, Shr,
     Not,
     Assign, PlusAssign, MinusAssign, StarAssign, SlashAssign,
     PlusPlus, MinusMinus,
@@ -129,7 +130,7 @@ impl Parser {
                             chars.next();
                             tokens.push(Token::EqEqEq);
                         } else {
-                            tokens.push(Token::EqEqEq);
+                            tokens.push(Token::EqEq);
                         }
                     } else {
                         tokens.push(Token::Assign);
@@ -143,7 +144,7 @@ impl Parser {
                             chars.next();
                             tokens.push(Token::NotEqEq);
                         } else {
-                            tokens.push(Token::NotEqEq);
+                            tokens.push(Token::NotEq);
                         }
                     } else {
                         tokens.push(Token::Not);
@@ -151,7 +152,10 @@ impl Parser {
                 }
                 '<' => {
                     chars.next();
-                    if chars.peek() == Some(&'=') {
+                    if chars.peek() == Some(&'<') {
+                        chars.next();
+                        tokens.push(Token::Shl);
+                    } else if chars.peek() == Some(&'=') {
                         chars.next();
                         tokens.push(Token::Le);
                     } else {
@@ -160,7 +164,10 @@ impl Parser {
                 }
                 '>' => {
                     chars.next();
-                    if chars.peek() == Some(&'=') {
+                    if chars.peek() == Some(&'>') {
+                        chars.next();
+                        tokens.push(Token::Shr);
+                    } else if chars.peek() == Some(&'=') {
                         chars.next();
                         tokens.push(Token::Ge);
                     } else {
@@ -172,6 +179,8 @@ impl Parser {
                     if chars.peek() == Some(&'&') {
                         chars.next();
                         tokens.push(Token::AndAnd);
+                    } else {
+                        tokens.push(Token::BitAnd);
                     }
                 }
                 '|' => {
@@ -179,7 +188,13 @@ impl Parser {
                     if chars.peek() == Some(&'|') {
                         chars.next();
                         tokens.push(Token::OrOr);
+                    } else {
+                        tokens.push(Token::BitOr);
                     }
+                }
+                '^' => {
+                    chars.next();
+                    tokens.push(Token::BitXor);
                 }
                 '?' => {
                     chars.next();
@@ -190,26 +205,84 @@ impl Parser {
                     chars.next();
                     let mut s = String::new();
                     while let Some(&ch) = chars.peek() {
-                        if ch == quote {
+                        if ch == '\\' {
+                            chars.next();
+                            if let Some(&esc) = chars.peek() {
+                                match esc {
+                                    'n' => s.push('\n'),
+                                    't' => s.push('\t'),
+                                    'r' => s.push('\r'),
+                                    '\\' => s.push('\\'),
+                                    '\'' => s.push('\''),
+                                    '"' => s.push('"'),
+                                    '0' => s.push('\0'),
+                                    _ => { s.push('\\'); s.push(esc); }
+                                }
+                                chars.next();
+                            }
+                        } else if ch == quote {
                             chars.next();
                             break;
+                        } else {
+                            s.push(ch);
+                            chars.next();
                         }
-                        s.push(ch);
-                        chars.next();
                     }
                     tokens.push(Token::String(s));
                 }
                 '0'..='9' => {
                     let mut num = String::new();
-                    while let Some(&ch) = chars.peek() {
-                        if ch.is_ascii_digit() || ch == '.' {
-                            num.push(ch);
+                    if chars.peek() == Some(&'0') {
+                        chars.next();
+                        num.push('0');
+                        if chars.peek() == Some(&'x') || chars.peek() == Some(&'X') {
                             chars.next();
+                            let mut hex = String::new();
+                            while let Some(&ch) = chars.peek() {
+                                if ch.is_ascii_hexdigit() {
+                                    hex.push(ch);
+                                    chars.next();
+                                } else {
+                                    break;
+                                }
+                            }
+                            let val = u64::from_str_radix(&hex, 16).unwrap_or(0);
+                            tokens.push(Token::Number(val as f64));
+                        } else if chars.peek() == Some(&'b') || chars.peek() == Some(&'B') {
+                            chars.next();
+                            let mut bin = String::new();
+                            while let Some(&ch) = chars.peek() {
+                                if ch == '0' || ch == '1' {
+                                    bin.push(ch);
+                                    chars.next();
+                                } else {
+                                    break;
+                                }
+                            }
+                            let val = u64::from_str_radix(&bin, 2).unwrap_or(0);
+                            tokens.push(Token::Number(val as f64));
                         } else {
-                            break;
+                            while let Some(&ch) = chars.peek() {
+                                if ch.is_ascii_digit() || ch == '.' || ch == 'e' || ch == 'E' || ch == '-' {
+                                    num.push(ch);
+                                    chars.next();
+                                } else {
+                                    break;
+                                }
+                            }
+                            tokens.push(Token::Number(num.parse().unwrap_or(0.0)));
                         }
+                    } else {
+                        while let Some(&ch) = chars.peek() {
+                            if ch.is_ascii_digit() || ch == '.' || ch == 'e' || ch == 'E' || ch == '-' {
+                                num.push(ch);
+                                chars.next();
+                            } else {
+                                break;
+                            }
+                        }
+                        tokens.push(Token::Number(num.parse().unwrap_or(0.0)));
                     }
-                    tokens.push(Token::Number(num.parse().unwrap_or(0.0)));
                 }
                 'a'..='z' | 'A'..='Z' | '_' => {
                     let mut ident = String::new();
@@ -592,8 +665,8 @@ impl Parser {
         
         loop {
             let op = match self.peek() {
-                Token::EqEqEq => BinOp::Eq,
-                Token::NotEqEq => BinOp::Ne,
+                Token::EqEq | Token::EqEqEq => BinOp::Eq,
+                Token::NotEq | Token::NotEqEq => BinOp::Ne,
                 _ => break,
             };
             self.advance();
@@ -609,7 +682,7 @@ impl Parser {
     }
     
     fn parse_comparison(&mut self) -> Result<HirExpr> {
-        let mut left = self.parse_additive()?;
+        let mut left = self.parse_bitwise()?;
         
         loop {
             let op = match self.peek() {
@@ -620,7 +693,7 @@ impl Parser {
                 _ => break,
             };
             self.advance();
-            let right = self.parse_additive()?;
+            let right = self.parse_bitwise()?;
             left = HirExpr::Binary {
                 op,
                 left: Box::new(left),
@@ -642,6 +715,30 @@ impl Parser {
             };
             self.advance();
             let right = self.parse_multiplicative()?;
+            left = HirExpr::Binary {
+                op,
+                left: Box::new(left),
+                right: Box::new(right),
+            };
+        }
+        
+        Ok(left)
+    }
+    
+    fn parse_bitwise(&mut self) -> Result<HirExpr> {
+        let mut left = self.parse_additive()?;
+        
+        loop {
+            let op = match self.peek() {
+                Token::BitAnd => BinOp::BitAnd,
+                Token::BitOr => BinOp::BitOr,
+                Token::BitXor => BinOp::BitXor,
+                Token::Shl => BinOp::Shl,
+                Token::Shr => BinOp::Shr,
+                _ => break,
+            };
+            self.advance();
+            let right = self.parse_additive()?;
             left = HirExpr::Binary {
                 op,
                 left: Box::new(left),

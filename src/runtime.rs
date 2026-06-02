@@ -13,17 +13,18 @@ pub struct JsString {
 }
 
 impl JsString {
-    pub fn new(s: &str) -> NonNull<Self> {
+    pub fn new(s: &str) -> Option<NonNull<Self>> {
         let len = s.len() as u32;
         let hash = Self::compute_hash(s.as_bytes());
         
         let layout = Layout::from_size_align(
             std::mem::size_of::<JsString>() + len as usize,
             8,
-        ).unwrap();
+        ).ok()?;
         
         unsafe {
             let ptr = alloc(layout) as *mut JsString;
+            let nn = NonNull::new(ptr)?;
             (*ptr).len = len;
             (*ptr).hash = hash;
             std::ptr::copy_nonoverlapping(
@@ -31,7 +32,7 @@ impl JsString {
                 (*ptr).data.as_mut_ptr(),
                 len as usize,
             );
-            NonNull::new_unchecked(ptr)
+            Some(nn)
         }
     }
     
@@ -52,7 +53,7 @@ impl JsString {
         hash
     }
     
-    pub fn concat(a: &str, b: &str) -> NonNull<Self> {
+    pub fn concat(a: &str, b: &str) -> Option<NonNull<Self>> {
         let mut result = String::with_capacity(a.len() + b.len());
         result.push_str(a);
         result.push_str(b);
@@ -67,41 +68,45 @@ pub struct JsArray {
 }
 
 impl JsArray {
-    pub fn new(capacity: u32) -> NonNull<Self> {
+    pub fn new(capacity: u32) -> Option<NonNull<Self>> {
         let cap = if capacity == 0 { 8 } else { capacity };
         let layout = Layout::from_size_align(
             std::mem::size_of::<JsArray>() + cap as usize * 8,
             8,
-        ).unwrap();
+        ).ok()?;
         
         unsafe {
             let ptr = alloc(layout) as *mut JsArray;
+            let nn = NonNull::new(ptr)?;
             (*ptr).len = 0;
             (*ptr).capacity = cap;
-            NonNull::new_unchecked(ptr)
+            Some(nn)
         }
     }
     
-    pub fn push(&mut self, value: u64) {
+    pub fn push(&mut self, value: u64) -> bool {
         if self.len >= self.capacity {
-            self.grow();
+            if !self.grow() {
+                return false;
+            }
         }
         unsafe {
             *self.data.as_mut_ptr().add(self.len as usize) = value;
         }
         self.len += 1;
+        true
     }
     
-    fn grow(&mut self) {
+    fn grow(&mut self) -> bool {
         let new_cap = self.capacity * 2;
-        let old_layout = Layout::from_size_align(
+        let Ok(old_layout) = Layout::from_size_align(
             std::mem::size_of::<JsArray>() + self.capacity as usize * 8,
             8,
-        ).unwrap();
-        let new_layout = Layout::from_size_align(
+        ) else { return false };
+        let Ok(new_layout) = Layout::from_size_align(
             std::mem::size_of::<JsArray>() + new_cap as usize * 8,
             8,
-        ).unwrap();
+        ) else { return false };
         
         unsafe {
             let ptr = realloc(
@@ -109,8 +114,12 @@ impl JsArray {
                 old_layout,
                 new_layout.size(),
             ) as *mut JsArray;
+            if ptr.is_null() {
+                return false;
+            }
             (*ptr).capacity = new_cap;
         }
+        true
     }
     
     pub fn get(&self, index: u32) -> u64 {
@@ -142,33 +151,36 @@ pub struct ObjectEntry {
 }
 
 impl JsObject {
-    pub fn new() -> NonNull<Self> {
+    pub fn new() -> Option<NonNull<Self>> {
         let layout = Layout::from_size_align(
             std::mem::size_of::<JsObject>() + 8 * std::mem::size_of::<ObjectEntry>(),
             8,
-        ).unwrap();
+        ).ok()?;
         
         unsafe {
             let ptr = alloc(layout) as *mut JsObject;
+            let nn = NonNull::new(ptr)?;
             (*ptr).size = 0;
             (*ptr).capacity = 8;
-            NonNull::new_unchecked(ptr)
+            Some(nn)
         }
     }
     
-    pub fn set(&mut self, key: u64, value: u64) {
+    pub fn set(&mut self, key: u64, value: u64) -> bool {
         for i in 0..self.size {
             unsafe {
                 let entry = &mut *self.entries.as_mut_ptr().add(i as usize);
                 if entry.key == key {
                     entry.value = value;
-                    return;
+                    return true;
                 }
             }
         }
         
         if self.size >= self.capacity {
-            self.grow();
+            if !self.grow() {
+                return false;
+            }
         }
         
         unsafe {
@@ -177,18 +189,19 @@ impl JsObject {
             entry.value = value;
         }
         self.size += 1;
+        true
     }
     
-    fn grow(&mut self) {
+    fn grow(&mut self) -> bool {
         let new_cap = self.capacity * 2;
-        let old_layout = Layout::from_size_align(
+        let Ok(old_layout) = Layout::from_size_align(
             std::mem::size_of::<JsObject>() + self.capacity as usize * std::mem::size_of::<ObjectEntry>(),
             8,
-        ).unwrap();
-        let new_layout = Layout::from_size_align(
+        ) else { return false };
+        let Ok(new_layout) = Layout::from_size_align(
             std::mem::size_of::<JsObject>() + new_cap as usize * std::mem::size_of::<ObjectEntry>(),
             8,
-        ).unwrap();
+        ) else { return false };
         
         unsafe {
             let ptr = realloc(
@@ -196,8 +209,12 @@ impl JsObject {
                 old_layout,
                 new_layout.size(),
             ) as *mut JsObject;
+            if ptr.is_null() {
+                return false;
+            }
             (*ptr).capacity = new_cap;
         }
+        true
     }
     
     pub fn get(&self, key: u64) -> u64 {

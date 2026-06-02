@@ -101,8 +101,12 @@ impl Linker {
             cwd.join("javascript-web-to-rust-native/packages/jade/toolchain/win32-x64-msvc/link.exe"),
             cwd.join("../javascript-web-to-rust-native/packages/jade/toolchain/win32-x64-msvc/link.exe"),
             cwd.join("../../javascript-web-to-rust-native/packages/jade/toolchain/win32-x64-msvc/link.exe"),
-            std::path::PathBuf::from("E:/Administrator/Documents/codebuddy-projects/javascript-web-to-rust-native/packages/jade/toolchain/win32-x64-msvc/link.exe"),
         ];
+        
+        if let Some(path) = std::env::var("TSN_LINKER").ok() {
+            let p = std::path::PathBuf::from(&path);
+            if p.exists() { return Some(path); }
+        }
         
         for path in candidates {
             if path.exists() {
@@ -114,10 +118,25 @@ impl Linker {
     
     fn find_crt_start() -> Option<String> {
         let cwd = std::env::current_dir().ok()?;
+        
+        if let Some(path) = std::env::var("TSN_CRT_START").ok() {
+            let p = std::path::PathBuf::from(&path);
+            if p.exists() { return Some(path); }
+        }
+        
+        let runtime_dir = cwd.join("ts-native-runtime/target/release/build");
+        if let Ok(entries) = std::fs::read_dir(&runtime_dir) {
+            for entry in entries.flatten() {
+                let start_path = entry.path().join("out/ea708c7824d36062-crt_start.o");
+                if start_path.exists() {
+                    return Self::normalize_path(start_path);
+                }
+            }
+        }
+        
         let candidates = vec![
-            cwd.join("ts-native-runtime/target/release/build/ts-native-runtime-022efd2cc526c363/out/ea708c7824d36062-crt_start.o"),
-            cwd.join("../ts-native-runtime/target/release/build/ts-native-runtime-022efd2cc526c363/out/ea708c7824d36062-crt_start.o"),
-            std::path::PathBuf::from("E:/Administrator/Documents/codebuddy-projects/ts-native-runtime/target/release/build/ts-native-runtime-022efd2cc526c363/out/ea708c7824d36062-crt_start.o"),
+            cwd.join("ts-native-runtime/target/release/build").join("crt_start.o"),
+            cwd.join("../ts-native-runtime/target/release/build").join("crt_start.o"),
         ];
         
         for path in candidates {
@@ -125,6 +144,7 @@ impl Linker {
                 return Self::normalize_path(path);
             }
         }
+
         None
     }
     

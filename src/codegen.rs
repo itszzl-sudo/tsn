@@ -563,15 +563,14 @@ fn compile_expr(
             if let Some((data_id, _bytes)) = _string_data.get(s) {
                 let gv = module.declare_data_in_func(*data_id, &mut builder.func);
                 let addr = builder.ins().global_value(types::I64, gv);
-                let addr_as_f64 = builder.ins().fcvt_from_sint(types::F64, addr);
                 
                 let mut sig = module.make_signature();
-                sig.params.push(AbiParam::new(types::F64));
+                sig.params.push(AbiParam::new(types::I64));
                 sig.returns.push(AbiParam::new(types::F64));
                 
                 if let Ok(id) = module.declare_function("js_string_from_static", cranelift_module::Linkage::Import, &sig) {
                     let func_ref = module.declare_func_in_func(id, &mut builder.func);
-                    let call = builder.ins().call(func_ref, &[addr_as_f64]);
+                    let call = builder.ins().call(func_ref, &[addr]);
                     builder.inst_results(call)[0]
                 } else {
                     builder.ins().f64const(f64::from_bits(UNDEFINED))
