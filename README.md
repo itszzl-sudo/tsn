@@ -9,10 +9,17 @@ TypeScript to native executable compiler.
 ## Quick Start
 
 ```bash
-# Install nightly build
-cargo install tsn
+# Install project manager (includes tsn)
+cargo install cargo-tsn
 
-# Compile TypeScript to native executable
+# Create a new project
+cargo tsn new my-project
+cd my-project
+
+# Add dependencies
+cargo tsn add regex
+
+# Compile
 tsn main.ts
 ./a.exe
 ```
