@@ -97,6 +97,7 @@ pub struct TsNativeMetadata {
 pub struct ExtensionRegistry {
     pub extensions: Vec<Extension>,
     pub function_map: HashMap<String, String>,
+    function_info: HashMap<String, ExternalFunction>,
 }
 
 impl ExtensionRegistry {
@@ -104,18 +105,24 @@ impl ExtensionRegistry {
         Self {
             extensions: Vec::new(),
             function_map: HashMap::new(),
+            function_info: HashMap::new(),
         }
     }
     
     pub fn register(&mut self, extension: Extension) {
         for (ts_name, func) in &extension.functions {
             self.function_map.insert(ts_name.clone(), func.impl_name.clone());
+            self.function_info.insert(ts_name.clone(), func.clone());
         }
         self.extensions.push(extension);
     }
     
     pub fn get_c_name(&self, ts_name: &str) -> Option<&String> {
         self.function_map.get(ts_name)
+    }
+    
+    pub fn get_function_info(&self, ts_name: &str) -> Option<&ExternalFunction> {
+        self.function_info.get(ts_name)
     }
     
     pub fn is_external_function(&self, ts_name: &str) -> bool {

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use codegen::CodeGen;
-use hir::{HirExpr, BinOp};
+use hir::{HirExpr, BinOp, SourceSpan};
 
 mod hir;
 mod builtins;
@@ -142,6 +142,7 @@ fn test_compile() -> Result<()> {
                     }
                 ))),
             ],
+            span: SourceSpan::unknown(),
         },
         HirExpr::Function {
             name: "main".to_string(),
@@ -184,6 +185,7 @@ fn test_compile() -> Result<()> {
                 },
                 HirExpr::Return(Some(Box::new(HirExpr::Identifier("sum".to_string())))),
             ],
+            span: SourceSpan::unknown(),
         },
     ];
     
@@ -227,6 +229,7 @@ fn parse_simple(source: &str) -> Result<Vec<HirExpr>> {
                         name,
                         params,
                         body: vec![],
+                        span: SourceSpan::unknown(),
                     });
                 }
             }
@@ -238,6 +241,7 @@ fn parse_simple(source: &str) -> Result<Vec<HirExpr>> {
             name: "main".to_string(),
             params: vec![],
             body: vec![HirExpr::Return(Some(Box::new(HirExpr::Number(0.0))))],
+            span: SourceSpan::unknown(),
         });
     }
     

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use cranelift::prelude::*;
-use cranelift_codegen::ir::FuncRef;
+
 use cranelift_module::{DataDescription, Linkage, Module};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 
@@ -77,10 +77,7 @@ impl CodeGen {
         self
     }
 
-    pub fn set_registry(&mut self, registry: crate::extension::ExtensionRegistry) {
-        self.registry = Some(registry);
-    }
-    
+
     #[allow(dead_code)]
     pub fn with_external_functions(mut self, functions: std::collections::HashMap<String, String>) -> Self {
         self.external_functions = functions;
@@ -110,7 +107,7 @@ impl CodeGen {
         
         // 第一遍：收集所有函数签名和字符串常量
         for expr in exprs {
-            if let HirExpr::Function { name, params, body: _ } = expr {
+            if let HirExpr::Function { name, params, body: _, span: _ } = expr {
                 let mut sig = module.make_signature();
                 for _ in params {
                     sig.params.push(AbiParam::new(types::F64));
@@ -140,7 +137,8 @@ impl CodeGen {
         
         let registry = self.registry.clone();
         for expr in exprs {
-            if let HirExpr::Function { name, params, body } = expr {
+            if let HirExpr::Function { name, params, body, span } = expr {
+                println!("  [{}] function {}({:?})", span, name, params);
                 self.compile_function(&mut module, name, params, body, &string_data, &registry)?;
             }
         }
@@ -272,8 +270,7 @@ impl CodeGen {
         
         let mut builder = FunctionBuilder::new(&mut ctx.func, &mut self.builder_context);
         
-        let runtime_funcs = declare_runtime_functions(module, &mut builder);
-        
+
         let entry_block = builder.create_block();
         builder.append_block_params_for_function_params(entry_block);
         builder.switch_to_block(entry_block);
@@ -290,7 +287,7 @@ impl CodeGen {
         
         let mut has_return = false;
         for stmt in body {
-            if compile_stmt(stmt, &mut builder, &mut variables, module, &self.function_ids, string_data, &runtime_funcs, None, None, registry) {
+            if compile_stmt(stmt, &mut builder, &mut variables, module, &self.function_ids, string_data, None, None, registry) {
                 has_return = true;
                 break;
             }
@@ -317,7 +314,7 @@ fn compile_stmt(
     module: &mut ObjectModule,
     function_ids: &std::collections::HashMap<String, cranelift_module::FuncId>,
     _string_data: &std::collections::HashMap<String, (cranelift_module::DataId, Vec<u8>)>,
-    _runtime_funcs: &RuntimeFunctions,
+
     loop_exit: Option<Block>,
     loop_continue: Option<Block>,
     registry: &Option<crate::extension::ExtensionRegistry>,
@@ -374,7 +371,7 @@ fn compile_stmt(
             builder.seal_block(then_block);
             let mut then_returns = false;
             for s in then_body {
-                if compile_stmt(s, builder, variables, module, function_ids, _string_data, _runtime_funcs, loop_exit, loop_continue, registry) {
+                if compile_stmt(s, builder, variables, module, function_ids, _string_data, loop_exit, loop_continue, registry) {
                     then_returns = true;
                 }
             }
@@ -387,7 +384,7 @@ fn compile_stmt(
             let mut else_returns = false;
             if let Some(else_stmts) = else_body {
                 for s in else_stmts {
-                    if compile_stmt(s, builder, variables, module, function_ids, _string_data, _runtime_funcs, loop_exit, loop_continue, registry) {
+                    if compile_stmt(s, builder, variables, module, function_ids, _string_data, loop_exit, loop_continue, registry) {
                         else_returns = true;
                     }
                 }
@@ -419,7 +416,7 @@ fn compile_stmt(
             builder.switch_to_block(body_block);
             let mut body_terminated = false;
             for s in body {
-                if compile_stmt(s, builder, variables, module, function_ids, _string_data, _runtime_funcs, Some(exit_block), Some(header_block), registry) {
+                if compile_stmt(s, builder, variables, module, function_ids, _string_data, Some(exit_block), Some(header_block), registry) {
                     body_terminated = true;
                     break;
                 }
@@ -438,7 +435,7 @@ fn compile_stmt(
         }
         HirExpr::For { init, cond, update, body } => {
             if let Some(i) = init {
-                compile_stmt(i, builder, variables, module, function_ids, _string_data, _runtime_funcs, loop_exit, loop_continue, registry);
+                compile_stmt(i, builder, variables, module, function_ids, _string_data, loop_exit, loop_continue, registry);
             }
             
             let header_block = builder.create_block();
@@ -461,7 +458,7 @@ fn compile_stmt(
             builder.switch_to_block(body_block);
             let mut body_terminated = false;
             for s in body {
-                if compile_stmt(s, builder, variables, module, function_ids, _string_data, _runtime_funcs, Some(exit_block), Some(update_block), registry) {
+                if compile_stmt(s, builder, variables, module, function_ids, _string_data, Some(exit_block), Some(update_block), registry) {
                     body_terminated = true;
                     break;
                 }
@@ -472,7 +469,7 @@ fn compile_stmt(
             
             builder.switch_to_block(update_block);
             if let Some(u) = update {
-                compile_stmt(u, builder, variables, module, function_ids, _string_data, _runtime_funcs, Some(exit_block), Some(update_block), registry);
+                compile_stmt(u, builder, variables, module, function_ids, _string_data, Some(exit_block), Some(update_block), registry);
             }
             builder.ins().jump(header_block, &[]);
             
@@ -488,7 +485,7 @@ fn compile_stmt(
         HirExpr::Block(stmts) => {
             let mut has_return = false;
             for s in stmts {
-                if compile_stmt(s, builder, variables, module, function_ids, _string_data, _runtime_funcs, loop_exit, loop_continue, registry) {
+                if compile_stmt(s, builder, variables, module, function_ids, _string_data, loop_exit, loop_continue, registry) {
                     has_return = true;
                 }
             }
@@ -760,25 +757,44 @@ fn compile_expr(
                         _ => {
                             if let Some(info) = builtins::lookup_builtin(name) {
                                 let arg_values: Vec<Value> = args.iter()
-                                    .take(info.param_count)
+                                    .take(info.param_count())
                                     .map(|arg| compile_expr(arg, builder, variables, module, function_ids, _string_data, registry))
                                     .collect();
 
-                                if arg_values.len() < info.param_count {
+                                if arg_values.len() < info.param_count() {
                                     builder.ins().f64const(0.0)
                                 } else {
                                     let mut sig = module.make_signature();
-                                    for _ in 0..info.param_count {
-                                        sig.params.push(AbiParam::new(types::F64));
+                                    for &pt in info.param_types {
+                                        sig.params.push(AbiParam::new(match pt {
+                                            builtins::ArgType::F64 => types::F64,
+                                            builtins::ArgType::I64 => types::I64,
+                                            builtins::ArgType::I32 => types::I32,
+                                        }));
                                     }
-                                    if info.has_return {
-                                        sig.returns.push(AbiParam::new(types::F64));
+                                    match info.ret_type {
+                                        builtins::RetType::F64 => sig.returns.push(AbiParam::new(types::F64)),
+                                        builtins::RetType::I64 => sig.returns.push(AbiParam::new(types::I64)),
+                                        builtins::RetType::I32 => sig.returns.push(AbiParam::new(types::I32)),
+                                        builtins::RetType::Void => {}
                                     }
                                     if let Ok(id) = module.declare_function(info.c_name, Linkage::Import, &sig) {
                                         let func_ref = module.declare_func_in_func(id, &mut builder.func);
-                                        let call = builder.ins().call(func_ref, &arg_values);
-                                        if info.has_return {
-                                            builder.inst_results(call)[0]
+                                        let converted_args: Vec<Value> = arg_values.iter().zip(info.param_types.iter())
+                                            .map(|(&val, &pt)| match pt {
+                                                builtins::ArgType::F64 => val,
+                                                builtins::ArgType::I64 => builder.ins().fcvt_to_sint(types::I64, val),
+                                                builtins::ArgType::I32 => builder.ins().fcvt_to_sint(types::I32, val),
+                                            })
+                                            .collect();
+                                        let call = builder.ins().call(func_ref, &converted_args);
+                                        if info.has_return() {
+                                            let raw = builder.inst_results(call)[0];
+                                            match info.ret_type {
+                                                builtins::RetType::I64 => builder.ins().fcvt_from_sint(types::F64, raw),
+                                                builtins::RetType::I32 => builder.ins().fcvt_from_sint(types::F64, raw),
+                                                _ => raw,
+                                            }
                                         } else {
                                             builder.ins().f64const(f64::from_bits(UNDEFINED))
                                         }
@@ -787,19 +803,44 @@ fn compile_expr(
                                     }
                                 }
                             } else if let Some(ref reg) = registry {
-                                if let Some(c_name) = reg.get_c_name(name) {
+                                if let Some(func_info) = reg.get_function_info(name) {
+                                    let c_name = &func_info.impl_name;
                                     let arg_values: Vec<Value> = args.iter()
                                         .map(|arg| compile_expr(arg, builder, variables, module, function_ids, _string_data, registry))
                                         .collect();
                                     let mut sig = module.make_signature();
-                                    for _ in 0..arg_values.len() {
-                                        sig.params.push(AbiParam::new(types::F64));
+                                    for at in &func_info.args {
+                                        sig.params.push(AbiParam::new(match at {
+                                            crate::extension::ArgType::Number | crate::extension::ArgType::Any => types::F64,
+                                            crate::extension::ArgType::Boolean => types::I32,
+                                            crate::extension::ArgType::String => types::I64,
+                                            _ => types::F64,
+                                        }));
                                     }
-                                    sig.returns.push(AbiParam::new(types::F64));
+                                    match func_info.ret {
+                                        crate::extension::RetType::Number | crate::extension::RetType::Any => sig.returns.push(AbiParam::new(types::F64)),
+                                        crate::extension::RetType::Boolean => sig.returns.push(AbiParam::new(types::I32)),
+                                        crate::extension::RetType::String => sig.returns.push(AbiParam::new(types::I64)),
+                                        crate::extension::RetType::Void => {}
+                                        _ => sig.returns.push(AbiParam::new(types::F64)),
+                                    }
                                     if let Ok(id) = module.declare_function(c_name, Linkage::Import, &sig) {
                                         let func_ref = module.declare_func_in_func(id, &mut builder.func);
-                                        let call = builder.ins().call(func_ref, &arg_values);
-                                        builder.inst_results(call)[0]
+                                        let converted_args: Vec<Value> = arg_values.iter().zip(func_info.args.iter())
+                                            .map(|(&val, at)| match at {
+                                                crate::extension::ArgType::Number | crate::extension::ArgType::Any => val,
+                                                crate::extension::ArgType::Boolean => builder.ins().fcvt_to_sint(types::I32, val),
+                                                crate::extension::ArgType::String => builder.ins().fcvt_to_sint(types::I64, val),
+                                                _ => val,
+                                            })
+                                            .collect();
+                                        let call = builder.ins().call(func_ref, &converted_args);
+                                        let raw = builder.inst_results(call)[0];
+                                        match func_info.ret {
+                                            crate::extension::RetType::Boolean => builder.ins().fcvt_from_sint(types::F64, raw),
+                                            crate::extension::RetType::String => builder.ins().fcvt_from_sint(types::F64, raw),
+                                            _ => raw,
+                                        }
                                     } else {
                                         builder.ins().f64const(f64::from_bits(UNDEFINED))
                                     }
@@ -967,25 +1008,6 @@ impl Default for CodeGen {
     }
 }
 
-struct RuntimeFunctions {
-    #[allow(dead_code)]
-    js_print: FuncRef,
-}
-
-fn declare_runtime_functions(module: &mut ObjectModule, builder: &mut FunctionBuilder) -> RuntimeFunctions {
-    let mut sig_print = module.make_signature();
-    sig_print.params.push(AbiParam::new(types::F64));
-    sig_print.returns.push(AbiParam::new(types::F64));
-    
-    let sig_print_ref = builder.import_signature(sig_print);
-    let js_print = builder.import_function(cranelift_codegen::ir::ExtFuncData {
-        name: cranelift_codegen::ir::ExternalName::user(cranelift_codegen::ir::UserExternalNameRef::new(0)),
-        signature: sig_print_ref,
-        colocated: false,
-    });
-    
-    RuntimeFunctions { js_print }
-}
 
 #[cfg(test)]
 mod tests {
@@ -1003,6 +1025,7 @@ mod tests {
                 name: "main".to_string(),
                 params: vec![],
                 body: vec![HirExpr::Return(Some(Box::new(HirExpr::Number(42.0))))],
+                span: SourceSpan::unknown(),
             },
         ];
         let result = compile_exprs(&hir);
@@ -1023,6 +1046,7 @@ mod tests {
                         right: Box::new(HirExpr::Identifier("b".to_string())),
                     }
                 )))],
+                span: SourceSpan::unknown(),
             },
         ];
         let result = compile_exprs(&hir);
@@ -1054,6 +1078,7 @@ mod tests {
                     },
                     HirExpr::Return(Some(Box::new(HirExpr::Identifier("i".to_string())))),
                 ],
+                span: SourceSpan::unknown(),
             },
         ];
         let result = compile_exprs(&hir);
@@ -1076,6 +1101,7 @@ mod tests {
                     },
                     HirExpr::Return(Some(Box::new(HirExpr::Number(0.0)))),
                 ],
+                span: SourceSpan::unknown(),
             },
         ];
         let result = compile_exprs(&hir);
@@ -1092,6 +1118,7 @@ mod tests {
                     HirExpr::Var { name: "s".to_string(), init: Some(Box::new(HirExpr::String("hello".to_string()))), is_mut: false },
                     HirExpr::Return(Some(Box::new(HirExpr::Identifier("s".to_string())))),
                 ],
+                span: SourceSpan::unknown(),
             },
         ];
         let result = compile_exprs(&hir);

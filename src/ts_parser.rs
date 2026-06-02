@@ -1,9 +1,11 @@
 use anyhow::Result;
-use crate::hir::{BinOp, HirExpr, UnaryOp};
+use crate::hir::{BinOp, HirExpr, SourceSpan, UnaryOp};
 
 pub struct Parser {
     tokens: Vec<Token>,
     pos: usize,
+    #[allow(dead_code)]
+    source_lines: Vec<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -36,7 +38,14 @@ enum Token {
 impl Parser {
     pub fn new(source: &str) -> Self {
         let tokens = Self::tokenize(source);
-        Self { tokens, pos: 0 }
+        let source_lines: Vec<usize> = std::iter::once(0)
+            .chain(source.match_indices('\n').map(|(i, _)| i + 1))
+            .collect();
+        Self { tokens, pos: 0, source_lines }
+    }
+
+    fn current_span(&self) -> SourceSpan {
+        SourceSpan::unknown()
     }
     
     fn tokenize(source: &str) -> Vec<Token> {
@@ -415,7 +424,7 @@ impl Parser {
         
         let body = self.parse_block_stmts()?;
         
-        Ok(HirExpr::Function { name, params, body })
+        Ok(HirExpr::Function { name, params, body, span: self.current_span() })
     }
     
     fn parse_var(&mut self) -> Result<HirExpr> {

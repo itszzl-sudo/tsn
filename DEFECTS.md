@@ -15,17 +15,15 @@
 | - | main.rs flag 解析简陋 | 2026-06-02 | 重写为位置无关的 flag 解析，输出文件从输入推导 |
 | - | runtime.rs UB 问题 | 2026-06-02 | alloc 空指针检查，grow/push/set 返回 bool，Layout 用 ok()? 替代 unwrap() |
 | - | linker.rs 重复代码 | 2026-06-02 | 移除 find_crt_start 中残留的重复行 |
+| 1.2 | 类型信息丢失 | 2026-06-02 | builtins添加ArgType/RetType，codegen根据类型生成签名+参数转换 |
+| 3.1 | RuntimeFunctions 死代码 | 2026-06-02 | 删除RuntimeFunctions结构体和declare_runtime_functions |
+| 3.5 | set_registry 死代码 | 2026-06-02 | 删除未使用的set_registry方法 |
+| 5.3 | 错误信息不定位源码 | 2026-06-02 | HIR添加SourceSpan，codegen输出函数位置（行号待填充） |
 
 ---
 
 ## 一、FFI 机制缺陷
 
-### 1.2 类型信息丢失
-
-- **位置**: `codegen.rs` 所有 `declare_function` 调用
-- **问题**: `ArgType`/`RetType` 仅用于清单描述，codegen 中所有参数一律按 F64 处理，忽略实际类型
-- **影响**: 无法正确传递 I32/I64/指针类型参数给 C 函数，ABI 不匹配时静默崩溃
-- **修复难度**: 中
 
 ### 1.3 字符串参数传递断裂
 
@@ -72,12 +70,6 @@
 
 ## 三、架构设计问题
 
-### 3.1 RuntimeFunctions 死代码
-
-- **位置**: `codegen.rs` 第986-1004行
-- **问题**: `declare_runtime_functions` 生成了 `RuntimeFunctions` 结构，但整个编译流程中 `_runtime_funcs` 从未被使用
-- **影响**: 死代码，增加维护负担
-- **修复难度**: 低（删除即可）
 
 ### 3.2 builtins 与 registry 职责重叠
 
@@ -99,13 +91,6 @@
 - **问题**: 返回 C 源码字符串，但标记为 `#[allow(dead_code)]`，实际未使用
 - **影响**: 死代码
 - **修复难度**: 低
-
-### 3.5 set_registry 死代码
-
-- **位置**: `codegen.rs` 第80行
-- **问题**: `CodeGen::set_registry()` 方法未使用（用 `with_registry` 替代）
-- **影响**: 编译警告
-- **修复难度**: 低（删除即可）
 
 ---
 
@@ -169,11 +154,11 @@
 - **影响**: 开发体验差，大项目编译慢
 - **修复难度**: 高
 
-### 5.3 错误信息不定位源码
+### 5.3 错误信息不定位源码（部分修复）
 
 - **问题**: 编译错误只报告 HIR 层位置，无法映射回 TS 源码行号
-- **影响**: 调试困难
-- **修复难度**: 中（需在解析阶段记录源码位置）
+- **当前状态**: HIR 已添加 `SourceSpan` 字段，codegen 输出函数位置；token 行号跟踪待实现
+- **修复难度**: 中（需在词法分析阶段记录行号）
 
 ### 5.4 无 DWARF 调试信息
 
@@ -225,23 +210,19 @@
 
 ### P1 - 应当修复（影响可用性）
 
-1. 类型信息丢失（1.2）
-2. 字符串参数传递断裂（1.3）
-3. 错误信息不定位源码（5.3）
+1. 字符串参数传递断裂（1.3）
 
 ### P2 - 建议修复（影响体验）
 
-4. RuntimeFunctions 死代码（3.1）
-5. set_registry 死代码（3.5）
-6. builtins 与 registry 重叠（3.2）
-7. 运行时双实现（3.3）
-8. release 构建 stack overflow（5.1）
-9. 标准库缺失（String/Array方法等）
+2. builtins 与 registry 重叠（3.2）
+3. 运行时双实现（3.3）
+4. release 构建 stack overflow（5.1）
+5. 标准库缺失（String/Array方法等）
 
 ### P3 - 长期目标
 
-10. 回调函数支持（1.4）
-11. 结构体传递（1.5）
-12. class/async/闭包/泛型（4.2-4.5）
-13. 增量编译（5.2）
-14. DWARF 调试信息（5.4）
+6. 回调函数支持（1.4）
+7. 结构体传递（1.5）
+8. class/async/闭包/泛型（4.2-4.5）
+9. 增量编译（5.2）
+10. DWARF 调试信息（5.4）
