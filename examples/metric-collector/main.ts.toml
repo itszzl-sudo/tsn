@@ -1,0 +1,6 @@
+# ts-native 依赖声明
+# 记录该 TS 文件所需的 tsnp 插件子目录
+# 如果此文件不存在，则所有 tsnp 子目录都视为依赖
+
+[dependencies]
+tsnp = ["http", "fs", "cli"]

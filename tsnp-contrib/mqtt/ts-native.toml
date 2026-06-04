@@ -1,0 +1,16 @@
+[package]
+name = "tsn-mqtt"
+version = "0.1.0"
+description = "MQTT client extension for tsn - connect, subscribe, publish"
+
+[ffi]
+c_module = "runtime/runtime_mqtt.c"
+
+[functions]
+"mqtt.connect" = { args = ["string", "string"], ret = "number", impl_name = "js_mqtt_connect" }
+"mqtt.disconnect" = { args = ["number"], ret = "void", impl_name = "js_mqtt_disconnect" }
+"mqtt.subscribe" = { args = ["number", "string", "number"], ret = "void", impl_name = "js_mqtt_subscribe" }
+"mqtt.publish" = { args = ["number", "string", "string"], ret = "void", impl_name = "js_mqtt_publish" }
+
+[link]
+libs = ["mosquitto"]

@@ -1,0 +1,21 @@
+[package]
+name = "tsn-dom-iot"
+version = "0.1.0"
+description = "Minimal DOM API extension for tsn - IoT UI scenarios (html-native-iot)"
+
+[ffi]
+c_module = "runtime/runtime_dom.c"
+
+[functions]
+"document.createElement" = { args = ["string"], ret = "number", impl_name = "js_dom_create_element" }
+"document.getElementById" = { args = ["string"], ret = "number", impl_name = "js_dom_get_element_by_id" }
+"document.createTextNode" = { args = ["string"], ret = "number", impl_name = "js_dom_create_text_node" }
+
+"element.appendChild" = { args = ["number", "number"], ret = "number", impl_name = "js_dom_append_child" }
+"element.setAttribute" = { args = ["number", "string", "string"], ret = "void", impl_name = "js_dom_set_attribute" }
+"element.textContent" = { args = ["number", "string"], ret = "void", impl_name = "js_dom_set_text_content" }
+"element.value" = { args = ["number", "string"], ret = "void", impl_name = "js_dom_set_value" }
+
+"element.addEventListener" = { args = ["number", "number", "number"], ret = "void", impl_name = "js_dom_add_event_listener" }
+
+"dom.mainLoop" = { args = [], ret = "void", impl_name = "js_dom_main_loop" }

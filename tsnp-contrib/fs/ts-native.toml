@@ -1,0 +1,26 @@
+# File System Extension
+# Provides native file I/O operations
+
+[package]
+name = "tsnp-fs"
+version = "0.1.0"
+tsnpVersion = "0.1.0"
+
+[functions]
+# Write string to file
+"file_write" = { args = ["string", "string"], ret = "void", impl_name = "file_write" }
+
+# Append string to file
+"file_append" = { args = ["string", "string"], ret = "void", impl_name = "file_append" }
+
+# Read file content
+"file_read" = { args = ["string"], ret = "string", impl_name = "file_read" }
+
+# Check if file exists
+"file_exists" = { args = ["string"], ret = "number", impl_name = "file_exists" }
+
+# Get file size
+"file_size" = { args = ["string"], ret = "number", impl_name = "file_size" }
+
+[link]
+lib = "c"

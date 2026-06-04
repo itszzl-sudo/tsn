@@ -1,0 +1,5 @@
+# ts-native 依赖声明
+# server.ts 使用 HTTP API 服务器扩展
+
+[dependencies]
+tsnp = ["metric-api"]

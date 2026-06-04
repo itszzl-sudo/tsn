@@ -1,0 +1,32 @@
+[package]
+name = "tsn"
+version = "0.3.1"
+edition = "2021"
+description = "TypeScript to native executable compiler - Stable Release"
+license = "MIT"
+authors = ["michael"]
+repository = "https://github.com/itszzl-sudo/ts-native"
+readme = "README.md"
+keywords = ["compiler", "typescript", "native", "cranelift"]
+categories = ["compilers"]
+
+[[bin]]
+name = "tsn"
+path = "src/main.rs"
+
+[dependencies]
+cranelift = "0.93"
+cranelift-module = "0.93"
+cranelift-object = "0.93"
+cranelift-codegen = "0.93"
+cranelift-native = "0.93"
+target-lexicon = "0.12"
+anyhow = "1.0"
+toml = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+which = "6.0"
+swc_common = "17"
+swc_ecma_ast = "18"
+swc_ecma_parser = "27"
+swc_atoms = "9"

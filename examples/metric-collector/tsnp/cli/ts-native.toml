@@ -1,0 +1,30 @@
+# CLI Extension
+# Provides command-line argument and system utilities
+
+[package]
+name = "tsnp-cli"
+version = "0.1.0"
+tsnpVersion = "0.1.0"
+
+[functions]
+# Get command-line argument count
+"argc" = { args = [], ret = "number", impl_name = "ts_argc" }
+
+# Get command-line argument by index
+"argv" = { args = ["number"], ret = "string", impl_name = "ts_argv" }
+
+# Get current timestamp in milliseconds
+"now_ms" = { args = [], ret = "number", impl_name = "ts_now_ms" }
+
+# Sleep for milliseconds
+"sleep" = { args = ["number"], ret = "void", impl_name = "ts_sleep" }
+
+# Get environment variable
+"getenv" = { args = ["string"], ret = "string", impl_name = "ts_getenv" }
+
+# Exit program with code
+"exit" = { args = ["number"], ret = "void", impl_name = "ts_exit" }
+
+[link]
+lib = "c"
+libs = ["kernel32", "user32"]
